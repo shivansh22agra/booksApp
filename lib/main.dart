@@ -1,4 +1,5 @@
 import 'package:booksapp/models/leadModel.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -25,70 +26,74 @@ class _MyAppState extends State<MyApp> {
     fetchLeads();
   }
 
+  bool isLoading = false;
   Future<void> fetchLeads() async {
+    isLoading = true;
+    setState(() {});
     final response = await http.post(
       Uri.parse('https://api.thenotary.app/lead/getLeads'),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
-      body: jsonEncode(<String, String>{
-        'notaryId': '6668baaed6a4670012a6e406',
-      }),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({"notaryId": "6668baaed6a4670012a6e406"}),
     );
-
+    print('__fneufner0 ${response.statusCode}');
     if (response.statusCode == 200) {
-      List jsonResponse = json.decode(response.body);
-      setState(() {
-        leads = jsonResponse.map((lead) => Lead.fromJson(lead)).toList();
-        filteredLeads = leads;
-      });
+      var data = jsonDecode(response.body);
+      print('__fneufner1 $data');
+
+      for (int i = 0; i < data['leads'].length; i++) {
+        leads.add(Lead.fromJson(data['leads'][i]));
+        filteredLeads.add(Lead.fromJson(data['leads'][i]));
+      }
+      isLoading = false;
+      setState(() {});
+      print('__fneufner2 ${leads.length}');
     } else {
       throw Exception('Failed to load leads');
     }
   }
 
-  void filterLeads(String query) {
-    filter = query;
-    filteredLeads = leads
-        .where((lead) => '${lead.firstName} ${lead.lastName}'
-            .toLowerCase()
-            .contains(query.toLowerCase()))
-        .toList();
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Flutter Tutorial'),
         ),
-        body: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                decoration: const InputDecoration(
-                  labelText: 'List view search',
-                ),
-                onChanged: filterLeads,
+        body: isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: CupertinoSearchTextField(
+                      onChanged: (value) {
+                        filteredLeads = leads
+                            .where((lead) => '${lead.firstName}'
+                                .toLowerCase()
+                                .contains(value.toLowerCase()))
+                            .toList();
+                        setState(() {});
+                      },
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: filteredLeads.length,
+                      itemBuilder: (context, index) {
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: NetworkImage(
+                                filteredLeads[index].imageUrl.toString()),
+                          ),
+                          title: Text('${filteredLeads[index].firstName} '),
+                          subtitle: Text(filteredLeads[index].email.toString()),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: filteredLeads.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    title: Text(
-                        '${filteredLeads[index].firstName} ${filteredLeads[index].lastName}'),
-                    subtitle: Text(filteredLeads[index].email),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
